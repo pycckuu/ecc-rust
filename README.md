@@ -4,7 +4,7 @@ This project implements Elliptic Curve Cryptography (ECC) operations in Rust. It
 
 ## Features
 
-- Elliptic curve representation and operations
+- Elliptic curve representation and operations (in Weierstrass form: y^2 = x^3 + ax + b)
 - Point arithmetic on elliptic curves (addition, doubling, scalar multiplication)
 - Finite field arithmetic
 - Comprehensive test suite for all implemented operations
@@ -19,7 +19,7 @@ This is the main entry point of the library. It re-exports the public items from
 
 ### src/ec.rs
 
-Contains the `EllipticCurve` struct and its implementation, which represents an elliptic curve and provides methods for curve operations.
+Contains the `EllipticCurve` struct and its implementation, which represents an elliptic curve in Weierstrass form (y^2 = x^3 + ax + b) and provides methods for curve operations.
 
 ### src/point.rs
 
@@ -29,11 +29,28 @@ Defines the `Point` struct, representing a point on an elliptic curve, including
 
 Implements the `FiniteField` struct with finite field arithmetic operations such as addition, multiplication, and inversion.
 
-### src/curves/mod.rs and src/curves/bjj.rs
+### src/curves/mod.rs and src/curves/secp256k1.rs
 
-These files  contain implementations of specific elliptic curves, including the Baby Jubjub (BJJ) curve.
+These files  contain implementations of specific elliptic curves
 
 Each module contains its own tests, ensuring the correctness of the implemented operations.
+
+### Supported Curves
+
+This implementation currently supports the following elliptic curve:
+
+#### secp256k1
+
+The secp256k1 curve is widely used in cryptocurrencies, most notably Bitcoin. It is defined by the following parameters:
+
+- **Equation**: y^2 = x^3 + 7 (over a finite field)
+- **Prime field**: p = 2^256 - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
+- **Base point (G) coordinates**:
+  - x = 79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798 (hex)
+  - y = 483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8 (hex)
+- **Order (n)**: FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 (hex)
+
+The implementation of the secp256k1 curve can be found in: `src/curves/secp256k1.rs`
 
 ## Usage
 
@@ -52,12 +69,12 @@ use ecc_rust::{EllipticCurve, Point, FiniteField};
 use num_bigint::BigUint;
 
 fn main() {
-    // Create a new elliptic curve y^2 = x^3 + 2x + 2 over F_17
-    let curve = EllipticCurve::new(
-        BigUint::from(2u32),
-        BigUint::from(2u32),
-        BigUint::from(17u32)
-    );
+    // Create a new elliptic curve in Weierstrass form: y^2 = x^3 + 2x + 2 over F_17
+    let curve = EllipticCurve {
+        a: BigUint::from(2u32),
+        b: BigUint::from(2u32),
+        p: BigUint::from(17u32)
+    };
 
 	// Create two points on the curve
     let p1 = Point::Coordinates(BigUint::from(6u32), BigUint::from(3u32));
