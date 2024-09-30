@@ -1,4 +1,4 @@
-use crate::{EllipticCurve, FiniteField, Point, WeierstrassCurve};
+use crate::{EllipticCurve, FiniteField, Point};
 use log::{debug, info, warn};
 use num_bigint::{BigUint, RandBigInt};
 use rand::thread_rng;
@@ -151,6 +151,9 @@ impl<T: EllipticCurve> ECDSA<T> {
         );
     }
 }
+
+#[cfg(test)]
+use crate::WeierstrassCurve;
 
 #[cfg(test)]
 mod tests {
