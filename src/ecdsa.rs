@@ -1,26 +1,16 @@
-use crate::{EllipticCurve, FiniteField, Point};
+use crate::{EllipticCurve, FiniteField, Point, WeierstrassCurve};
 use log::{debug, info, warn};
 use num_bigint::{BigUint, RandBigInt};
 use rand::thread_rng;
 
-pub struct ECDSA {
-    curve: EllipticCurve,
-    generator: Point,
-    order: BigUint,
+pub struct ECDSA<T: EllipticCurve> {
+    curve: T,
 }
 
-impl ECDSA {
-    pub fn new(curve: EllipticCurve, generator: Point, order: BigUint) -> Self {
+impl<T: EllipticCurve> ECDSA<T> {
+    pub fn new(curve: T) -> Self {
         debug!("Creating new ECDSA instance");
-        assert!(
-            curve.is_on_curve(&generator),
-            "Generator point must be on the curve"
-        );
-        ECDSA {
-            curve,
-            generator,
-            order,
-        }
+        ECDSA { curve }
     }
 
     pub fn generate_keypair(&self) -> (BigUint, Point) {
@@ -35,10 +25,14 @@ impl ECDSA {
 
     pub fn generate_public_key(&self, private_key: &BigUint) -> Point {
         debug!("Generating public key from private key");
-        self.curve.mul(&self.generator, private_key)
+        self.curve.mul(self.curve.base_point(), private_key)
     }
 
-    pub fn sign(&self, message: &BigUint, private_key: &BigUint) -> Result<(BigUint, BigUint), &'static str> {
+    pub fn sign(
+        &self,
+        message: &BigUint,
+        private_key: &BigUint,
+    ) -> Result<(BigUint, BigUint), &'static str> {
         self.validate_input(message, private_key)?;
         debug!("Signing message");
         let k = self.generate_random_private_key();
@@ -58,19 +52,19 @@ impl ECDSA {
             return false;
         }
 
-        let s_inv = FiniteField::inv_mul(s, &self.order);
-        let u1 = FiniteField::mul(message, &s_inv, &self.order);
-        let u2 = FiniteField::mul(r, &s_inv, &self.order);
+        let s_inv = FiniteField::inv_mul(s, self.curve.order());
+        let u1 = FiniteField::mul(message, &s_inv, self.curve.order());
+        let u2 = FiniteField::mul(r, &s_inv, self.curve.order());
         let point = self.calculate_verification_point(&u1, &u2, public_key);
 
         self.is_signature_valid(point, r)
     }
 
     fn validate_input(&self, message: &BigUint, private_key: &BigUint) -> Result<(), &'static str> {
-        if private_key >= &self.order {
+        if private_key >= self.curve.order() {
             return Err("Private key must be less than the order of the curve");
         }
-        if message >= &self.order {
+        if message >= self.curve.order() {
             return Err("Message must be less than the order of the curve");
         }
         Ok(())
@@ -82,7 +76,7 @@ impl ECDSA {
         private_key: &BigUint,
         k: &BigUint,
     ) -> Result<(BigUint, BigUint), &'static str> {
-        if k >= &self.order {
+        if k >= self.curve.order() {
             return Err("k must be less than the order of the curve");
         }
 
@@ -94,7 +88,7 @@ impl ECDSA {
     }
 
     fn calculate_r(&self, k: &BigUint) -> BigUint {
-        match self.curve.mul(&self.generator, k) {
+        match self.curve.mul(self.curve.base_point(), k) {
             Point::Coordinates(x, _) => x,
             Point::Identity => {
                 warn!("Unexpected point at infinity during signing");
@@ -110,14 +104,14 @@ impl ECDSA {
         k: &BigUint,
         r: &BigUint,
     ) -> BigUint {
-        let s = FiniteField::mul(r, private_key, &self.order);
-        let s = FiniteField::add(message, &s, &self.order);
-        let k_inv = FiniteField::inv_mul(k, &self.order);
-        FiniteField::mul(&s, &k_inv, &self.order)
+        let s = FiniteField::mul(r, private_key, self.curve.order());
+        let s = FiniteField::add(message, &s, self.curve.order());
+        let k_inv = FiniteField::inv_mul(k, self.curve.order());
+        FiniteField::mul(&s, &k_inv, self.curve.order())
     }
 
     fn is_valid_signature(&self, r: &BigUint, s: &BigUint) -> bool {
-        if r >= &self.order || s >= &self.order {
+        if r >= self.curve.order() || s >= self.curve.order() {
             warn!("Invalid signature: r or s is too large");
             return false;
         }
@@ -130,7 +124,7 @@ impl ECDSA {
         u2: &BigUint,
         public_key: &Point,
     ) -> Point {
-        let u1a = self.curve.mul(&self.generator, u1);
+        let u1a = self.curve.mul(self.curve.base_point(), u1);
         let u2b = self.curve.mul(public_key, u2);
         self.curve.add(&u1a, &u2b)
     }
@@ -147,7 +141,7 @@ impl ECDSA {
 
     fn generate_random_private_key(&self) -> BigUint {
         debug!("Generating random private key");
-        thread_rng().gen_biguint_range(&BigUint::from(1u32), &self.order)
+        thread_rng().gen_biguint_range(&BigUint::from(1u32), self.curve.order())
     }
 
     fn validate_public_key(&self, public_key: &Point) {
@@ -167,18 +161,15 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
     }
 
-    fn create_test_ecdsa() -> ECDSA {
-        let curve = EllipticCurve {
-            a: BigUint::from(2u32),
-            b: BigUint::from(2u32),
-            p: BigUint::from(17u32),
-        };
-
-        ECDSA::new(
-            curve,
-            Point::Coordinates(BigUint::from(5u32), BigUint::from(1u32)),
+    fn create_test_ecdsa() -> ECDSA<WeierstrassCurve> {
+        let curve = WeierstrassCurve::new(
+            BigUint::from(2u32),
+            BigUint::from(2u32),
+            BigUint::from(17u32),
             BigUint::from(19u32),
-        )
+            Point::Coordinates(BigUint::from(5u32), BigUint::from(1u32)),
+        );
+        ECDSA::new(curve)
     }
 
     #[test]
@@ -186,7 +177,7 @@ mod tests {
         init();
         let ecdsa = create_test_ecdsa();
         let (private_key, public_key) = ecdsa.generate_keypair();
-        assert!(private_key < ecdsa.order);
+        assert!(private_key < *ecdsa.curve.order());
         assert!(
             ecdsa.curve.is_on_curve(&public_key),
             "Generated public key is not on the curve"
@@ -202,7 +193,9 @@ mod tests {
             ecdsa.generate_public_key(&BigUint::from(7u32)),
         );
         let message = BigUint::from(10u32);
-        let signature = ecdsa.sign_with_k(&message, &private_key, &BigUint::from(18u32)).unwrap();
+        let signature = ecdsa
+            .sign_with_k(&message, &private_key, &BigUint::from(18u32))
+            .unwrap();
         assert!(ecdsa.verify(&message, &signature, &public_key));
     }
 
