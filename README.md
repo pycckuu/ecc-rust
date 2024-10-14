@@ -9,6 +9,7 @@ This project implements Elliptic Curve Cryptography (ECC) operations in Rust. It
 - Finite field arithmetic
 - ECDSA (Elliptic Curve Digital Signature Algorithm) implementation
 - Comprehensive test suite for all implemented operations
+- Chaum-Pedersen zero-knowledge proof protocol implementation
 
 ## Structure
 
@@ -38,6 +39,14 @@ Implements the ECDSA algorithm for digital signatures using elliptic curves.
 
 These files contain implementations of specific elliptic curves, currently supporting the secp256k1 curve.
 
+### src/zk/mod.rs and src/zk/chaum_pedersen.rs
+
+These files contain the implementation of the Chaum-Pedersen zero-knowledge proof protocol.
+
+### src/group.rs
+
+Defines the `Group` struct, which represents a cyclic group used in various cryptographic protocols, including Chaum-Pedersen.
+
 Each module contains its own tests, ensuring the correctness of the implemented operations.
 
 ## Usage
@@ -53,7 +62,7 @@ ecc-rust = { git = "https://github.com/yourusername/ecc-rust.git" }
 Example usage:
 
 ```rust
-use ecc_rust::{WeierstrassCurve, Point, FiniteField, EllipticCurve, ECDSA, create_secp256k1_curve};
+use ecc_rust::{WeierstrassCurve, Point, FiniteField, EllipticCurve, ECDSA, create_secp256k1_curve, ChaumPedersen, Group};
 use num_bigint::BigUint;
 
 fn main() {
@@ -87,6 +96,25 @@ fn main() {
     let scalar = BigUint::from(5u32);
     let product = ecdsa.curve.mul(&g, &scalar);
     println!("Scalar multiplication result: {:?}", product);
+
+    // Chaum-Pedersen protocol example
+    let group = Group::new(
+        BigUint::from(23u32), // p
+        BigUint::from(11u32), // q
+        BigUint::from(4u32),  // g
+        BigUint::from(9u32),  // h
+    );
+    let chaum_pedersen = ChaumPedersen::new(group);
+
+    let x = BigUint::from(2u32); // secret
+    let k = BigUint::from(3u32); // random value
+
+    let commitment = chaum_pedersen.commit(&x, &k);
+    let challenge = chaum_pedersen.challenge(&BigUint::from(1u32));
+    let proof = chaum_pedersen.proof(&k, &challenge.c, &x);
+
+    let is_valid = chaum_pedersen.verify(&commitment, &challenge, &proof);
+    println!("Chaum-Pedersen proof is valid: {}", is_valid);
 }
 ```
 
@@ -97,6 +125,7 @@ This example demonstrates:
 3. Generating a keypair
 4. Signing and verifying a message
 5. Performing point addition and scalar multiplication on the curve
+6. Using the Chaum-Pedersen zero-knowledge proof protocol
 
 Make sure to handle any potential errors or invalid inputs in your actual implementation.
 
