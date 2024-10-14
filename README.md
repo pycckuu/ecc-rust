@@ -2,6 +2,8 @@
 
 This project implements Elliptic Curve Cryptography (ECC) operations in Rust. It provides a foundation for working with elliptic curves, points on these curves, and various cryptographic operations.
 
+**Important Note:** This is not production-ready code. All examples and implementations in this project were created as part of a learning process to understand the concepts of elliptic curve cryptography. The code should not be used in any security-critical or production environments.
+
 ## Features
 
 - Elliptic curve representation and operations (in Weierstrass form: y^2 = x^3 + ax + b)
